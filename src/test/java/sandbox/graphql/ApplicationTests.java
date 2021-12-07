@@ -29,7 +29,7 @@ class ApplicationTests {
 	void greeting() {
 		String queryName = "greeting";
 		this.graphQlTester.query("{" + queryName + "}").execute()
-				.path(queryName).entity(String.class).isEqualTo("Hello");
+				.path(queryName).entity(String.class).isEqualTo("Hello 007");
 	}
 
 	@Test

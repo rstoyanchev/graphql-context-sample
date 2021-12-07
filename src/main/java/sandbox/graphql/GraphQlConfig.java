@@ -40,10 +40,14 @@ public class GraphQlConfig {
 	private static final Map<String, DataFetcher<?>> dataFetchers = new LinkedHashMap<>();
 
 	static {
-		dataFetchers.put("greeting", env -> "Hello");
-		dataFetchers.put("greetingMono", env -> Mono.delay(Duration.ofMillis(10)).map(aLong -> "Hello"));
-	}
+		// Imperative DataFetcher
+		dataFetchers.put("greeting", env -> "Hello " + CustomThreadLocalHolder.getValue());
 
+		// Reactive DataFetcher
+		dataFetchers.put("greetingMono", env ->
+				Mono.delay(Duration.ofMillis(10)).map(aLong -> "Hello")
+		);
+	}
 
 
 	@Bean

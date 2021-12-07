@@ -15,9 +15,14 @@
  */
 package sandbox.graphql;
 
+import graphql.GraphQLContext;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
 import reactor.core.publisher.Mono;
+import reactor.util.context.ContextView;
+import sandbox.context.ContextSnapshot;
+
+import org.springframework.util.Assert;
 
 public class DataFetcherAdapter<T> implements DataFetcher<T> {
 
@@ -33,11 +38,23 @@ public class DataFetcherAdapter<T> implements DataFetcher<T> {
 	@SuppressWarnings("unchecked")
 	public T get(DataFetchingEnvironment environment) throws Exception {
 
-		Object result = this.delegate.get(environment);
+		GraphQLContext graphQlContext = environment.getGraphQlContext();
+		ContextView reactorContext = graphQlContext.get(ContextView.class.getName());
+		Assert.notNull(reactorContext, "No Reactor Context");
+
+		ContextSnapshot contextSnapshot = reactorContext.get(ContextSnapshot.class.getName());
+		Object result;
+		try {
+			contextSnapshot.restoreThreadLocalValues();
+			result = this.delegate.get(environment);
+		}
+		finally {
+			contextSnapshot.resetValues();
+		}
 
 		if (result instanceof Mono) {
 			Mono<?> valueMono = (Mono<?>) result;
-			result = valueMono.toFuture();
+			result = valueMono.contextWrite(reactorContext).toFuture();
 		}
 
 		return (T) result;
