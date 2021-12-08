@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package sandbox.graphql;
+package sandbox.graphql.context;
 
 import java.util.Map;
 
@@ -28,7 +28,10 @@ public class CustomThreadLocalAccessor implements ThreadLocalAccessor {
 
 	@Override
 	public void extractValues(Map<String, Object> container) {
-		container.put(KEY, CustomThreadLocalHolder.getValue());
+		String value = CustomThreadLocalHolder.getValue();
+		if (value != null) {
+			container.put(KEY, CustomThreadLocalHolder.getValue());
+		}
 	}
 
 	@Override

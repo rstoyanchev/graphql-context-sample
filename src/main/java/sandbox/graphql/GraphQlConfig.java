@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import graphql.GraphQL;
 import graphql.schema.DataFetcher;
@@ -28,6 +30,7 @@ import graphql.schema.idl.SchemaGenerator;
 import graphql.schema.idl.SchemaParser;
 import graphql.schema.idl.TypeDefinitionRegistry;
 import reactor.core.publisher.Mono;
+import sandbox.graphql.context.CustomThreadLocalHolder;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,6 +52,9 @@ public class GraphQlConfig {
 		);
 	}
 
+	@Bean ExecutorService executorService() {
+		return Executors.newSingleThreadExecutor();
+	}
 
 	@Bean
 	GraphQL graphQl() throws IOException {

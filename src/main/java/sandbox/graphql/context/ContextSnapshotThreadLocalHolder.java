@@ -13,18 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package sandbox.graphql;
+package sandbox.graphql.context;
 
-public class CustomThreadLocalHolder {
+import sandbox.context.ContextSnapshot;
 
-	private static final ThreadLocal<String> threadLocal = new ThreadLocal<>();
+public class ContextSnapshotThreadLocalHolder {
+
+	private static final ThreadLocal<ContextSnapshot> threadLocal = new ThreadLocal<>();
 
 
-	public static void setValue(String value) {
+	public static void setValue(ContextSnapshot value) {
 		threadLocal.set(value);
 	}
 
-	public static String getValue() {
+	public static ContextSnapshot getValue() {
 		return threadLocal.get();
 	}
 

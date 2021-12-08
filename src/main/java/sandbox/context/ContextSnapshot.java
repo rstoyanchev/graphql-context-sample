@@ -15,6 +15,7 @@
  */
 package sandbox.context;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,11 +25,14 @@ public class ContextSnapshot {
 
 	private final Map<String, Object> threadLocalValues = new ConcurrentHashMap<>();
 
+	private final Map<String, Object> baggageValues = new ConcurrentHashMap<>();
 
-	public ContextSnapshot(Map<String, ThreadLocalAccessor> accessors) {
+	private final Scope.CompositeScope compositeScope;
+
+	public ContextSnapshot(Map<String, ThreadLocalAccessor> accessors, List<ScopeProvider> scopes) {
+		this.compositeScope = new Scope.CompositeScope(scopes);
 		this.threadLocalAccessors.putAll(accessors);
 	}
-
 
 	public void captureThreadLocalValues() {
 		this.threadLocalAccessors.values().forEach(accessor -> accessor.extractValues(this.threadLocalValues));
@@ -42,4 +46,19 @@ public class ContextSnapshot {
 		this.threadLocalAccessors.values().forEach(accessor -> accessor.resetValues(threadLocalValues));
 	}
 
+	public void put(String string, Object object) {
+		this.baggageValues.put(string, object);
+	}
+
+	public Object get(Object string) {
+		return this.baggageValues.get(string);
+	}
+
+	public void remove(Object key) {
+		this.baggageValues.remove(key);
+	}
+
+	public Scope open() {
+		return compositeScope.open(this);
+	}
 }
