@@ -21,6 +21,7 @@ import graphql.schema.DataFetchingEnvironment;
 import reactor.core.publisher.Mono;
 import reactor.util.context.ContextView;
 import sandbox.context.ContextSnapshot;
+import sandbox.context.ContextSnapshot.Scope;
 
 import org.springframework.util.Assert;
 
@@ -44,12 +45,9 @@ public class DataFetcherAdapter<T> implements DataFetcher<T> {
 
 		ContextSnapshot contextSnapshot = reactorContext.get(ContextSnapshot.class.getName());
 		Object result;
-		try {
+		try (Scope scope = contextSnapshot.restoreThreadLocalValues()) {
 			contextSnapshot.restoreThreadLocalValues();
 			result = this.delegate.get(environment);
-		}
-		finally {
-			contextSnapshot.resetValues();
 		}
 
 		if (result instanceof Mono) {

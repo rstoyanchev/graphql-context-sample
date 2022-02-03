@@ -1,9 +1,7 @@
 package sandbox.graphql;
 
 import sandbox.context.ContextSnapshot;
-import sandbox.context.Scope;
-import sandbox.graphql.context.ContextSnapshotThreadLocalAccessor;
-import sandbox.graphql.context.ContextSnapshotThreadLocalHolder;
+import sandbox.context.ContextSnapshot.Scope;
 
 public class InstrumentedRunnable implements Runnable {
 
@@ -16,13 +14,9 @@ public class InstrumentedRunnable implements Runnable {
 		this.delegate = delegate;
 	}
 
-	public InstrumentedRunnable(Runnable delegate) {
-		this(ContextSnapshotThreadLocalHolder.getValue(), delegate);
-	}
-
 	@Override
 	public void run() {
-		try (Scope scope = contextSnapshot.open()) {
+		try (Scope scope = contextSnapshot.restoreThreadLocalValues()) {
 			this.delegate.run();
 		}
 	}

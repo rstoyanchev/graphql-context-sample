@@ -15,7 +15,6 @@
  */
 package sandbox.context;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,42 +22,42 @@ public class ContextSnapshot {
 
 	private final Map<String, ThreadLocalAccessor> threadLocalAccessors = new ConcurrentHashMap<>();
 
-	private final Map<String, Object> threadLocalValues = new ConcurrentHashMap<>();
+	private final Map<String, Object> values = new ConcurrentHashMap<>();
 
-	private final Map<String, Object> baggageValues = new ConcurrentHashMap<>();
 
-	private final Scope.CompositeScope compositeScope;
-
-	public ContextSnapshot(Map<String, ThreadLocalAccessor> accessors, List<ScopeProvider> scopes) {
-		this.compositeScope = new Scope.CompositeScope(scopes);
+	public ContextSnapshot(Map<String, ThreadLocalAccessor> accessors) {
 		this.threadLocalAccessors.putAll(accessors);
 	}
 
 	public void captureThreadLocalValues() {
-		this.threadLocalAccessors.values().forEach(accessor -> accessor.extractValues(this.threadLocalValues));
+		this.threadLocalAccessors.values().forEach(accessor -> accessor.extractValues(this.values));
 	}
 
-	public void restoreThreadLocalValues() {
-		this.threadLocalAccessors.values().forEach(accessor -> accessor.restoreValues(threadLocalValues));
+	public Scope restoreThreadLocalValues() {
+		this.threadLocalAccessors.values().forEach(accessor -> accessor.restoreValues(values));
+		return () -> this.threadLocalAccessors.values().forEach(accessor -> accessor.resetValues(values));
 	}
 
-	public void resetValues() {
-		this.threadLocalAccessors.values().forEach(accessor -> accessor.resetValues(threadLocalValues));
+	public void put(String key, Object value) {
+		this.values.put(key, value);
 	}
 
-	public void put(String string, Object object) {
-		this.baggageValues.put(string, object);
+	public Object get(String key) {
+		return this.values.get(key);
 	}
 
-	public Object get(Object string) {
-		return this.baggageValues.get(string);
+	public void remove(String key) {
+		this.values.remove(key);
 	}
 
-	public void remove(Object key) {
-		this.baggageValues.remove(key);
-	}
 
-	public Scope open() {
-		return compositeScope.open(this);
+	/**
+	 * Demarcates the scope of restored ThreadLocal values.
+	 */
+	public interface Scope extends AutoCloseable {
+
+		@Override
+		void close();
+
 	}
 }

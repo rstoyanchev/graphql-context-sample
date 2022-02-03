@@ -16,7 +16,6 @@
 package sandbox.graphql;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
@@ -30,11 +29,8 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.context.ContextView;
 import sandbox.context.ContextSnapshot;
-import sandbox.context.Scope;
+import sandbox.context.ContextSnapshot.Scope;
 import sandbox.context.ThreadLocalAccessor;
-import sandbox.context.ScopeProvider;
-import sandbox.graphql.context.ContextSnapshotThreadLocalAccessor;
-import sandbox.graphql.context.ContextSnapshotThreadLocalHolder;
 import sandbox.graphql.context.CustomThreadLocalHolder;
 
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,16 +46,13 @@ public class GraphQlController {
 
 	private final Map<String, ThreadLocalAccessor> threadLocalAccessors;
 
-	private final List<ScopeProvider> scopes;
-
 	private final ExecutorService executor;
 
 
-	public GraphQlController(GraphQL graphQL, ExecutorService executor, Map<String, ThreadLocalAccessor> threadLocalAccessors, List<ScopeProvider> scopes) {
+	public GraphQlController(GraphQL graphQL, ExecutorService executor, Map<String, ThreadLocalAccessor> threadLocalAccessors) {
 		this.graphQL = graphQL;
 		this.executor = executor;
 		this.threadLocalAccessors = threadLocalAccessors;
-		this.scopes = scopes;
 	}
 
 	@PostMapping("/graphql")
@@ -67,26 +60,21 @@ public class GraphQlController {
 		return Mono.deferContextual(contextView -> {
 					ContextSnapshot snapshot = contextView.get(ContextSnapshot.class.getName());
 
-					try (Scope scope = snapshot.open()) {
+					try (Scope scope = snapshot.restoreThreadLocalValues()) {
 						log.info("FOO 1 {}", CustomThreadLocalHolder.getValue());
 						assertThatValueIsEqualTo("007", CustomThreadLocalHolder.getValue());
 						assertThatValueIsEqualTo("bar", snapshot.get("foo"));
 						executor.execute(new InstrumentedRunnable(snapshot, () -> {
 							assertThatValueIsEqualTo("007", CustomThreadLocalHolder.getValue());
 							assertThatValueIsEqualTo("bar", snapshot.get("foo"));
-							assertThatValueIsEqualTo("bar", ContextSnapshotThreadLocalHolder.getValue().get("foo"));
-							assertThatValueIsEqualTo(snapshot, ContextSnapshotThreadLocalHolder.getValue());
 						}));
-						executor.execute(new InstrumentedRunnable(() -> {
+						executor.execute(new InstrumentedRunnable(snapshot, () -> {
 							assertThatValueIsEqualTo("007", CustomThreadLocalHolder.getValue());
 							assertThatValueIsEqualTo("bar", snapshot.get("foo"));
-							assertThatValueIsEqualTo("bar", ContextSnapshotThreadLocalHolder.getValue().get("foo"));
-							assertThatValueIsEqualTo(snapshot, ContextSnapshotThreadLocalHolder.getValue());
 						}));
 					}
 
 					assertThatValueIsEqualTo(null, CustomThreadLocalHolder.getValue());
-					assertThatValueIsEqualTo(null, ContextSnapshotThreadLocalHolder.getValue());
 
 					ExecutionInput input = executionInput(body, contextView);
 					return Mono.fromFuture(this.graphQL.executeAsync(input)).map(ExecutionResult::toSpecification);
@@ -94,7 +82,7 @@ public class GraphQlController {
 				.subscribeOn(Schedulers.boundedElastic())  // Switch threads to test context passing
 				.contextWrite(context -> {
 					// Capture + save ThreadLocal's in Reactor Context
-					ContextSnapshot snapshot = new ContextSnapshot(this.threadLocalAccessors, scopes);
+					ContextSnapshot snapshot = new ContextSnapshot(this.threadLocalAccessors);
 					snapshot.captureThreadLocalValues();
 					snapshot.put("foo", "bar");
 					return context.put(ContextSnapshot.class.getName(), snapshot);
