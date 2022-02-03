@@ -28,8 +28,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class CustomThreadLocalFilter implements Filter {
 
-	public static final String KEY = CustomThreadLocalFilter.class.getName() + ".name";
-
 	@Override
 	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
 		CustomThreadLocalHolder.setValue("007");

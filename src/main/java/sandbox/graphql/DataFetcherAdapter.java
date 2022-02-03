@@ -19,9 +19,9 @@ import graphql.GraphQLContext;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
 import reactor.core.publisher.Mono;
-import reactor.util.context.ContextView;
-import sandbox.context.ContextSnapshot;
-import sandbox.context.ContextSnapshot.Scope;
+import sandbox.context.ContextContainer;
+import sandbox.context.ContextContainer.Scope;
+import sandbox.context.ReactorContextUtils;
 
 import org.springframework.util.Assert;
 
@@ -40,19 +40,17 @@ public class DataFetcherAdapter<T> implements DataFetcher<T> {
 	public T get(DataFetchingEnvironment environment) throws Exception {
 
 		GraphQLContext graphQlContext = environment.getGraphQlContext();
-		ContextView reactorContext = graphQlContext.get(ContextView.class.getName());
-		Assert.notNull(reactorContext, "No Reactor Context");
+		ContextContainer container = graphQlContext.get(ContextContainer.class.getName());
+		Assert.notNull(container, "No Reactor Context");
 
-		ContextSnapshot contextSnapshot = reactorContext.get(ContextSnapshot.class.getName());
 		Object result;
-		try (Scope scope = contextSnapshot.restoreThreadLocalValues()) {
-			contextSnapshot.restoreThreadLocalValues();
+		try (Scope scope = container.restoreThreadLocalValues()) {
 			result = this.delegate.get(environment);
 		}
 
 		if (result instanceof Mono) {
 			Mono<?> valueMono = (Mono<?>) result;
-			result = valueMono.contextWrite(reactorContext).toFuture();
+			result = valueMono.contextWrite(context -> ReactorContextUtils.restoreReactorContext(context, container)).toFuture();
 		}
 
 		return (T) result;

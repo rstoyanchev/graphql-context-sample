@@ -17,6 +17,7 @@ package sandbox.graphql.context;
 
 import java.util.Map;
 
+import sandbox.context.ContextContainer;
 import sandbox.context.ThreadLocalAccessor;
 
 import org.springframework.stereotype.Component;
@@ -27,7 +28,7 @@ public class CustomThreadLocalAccessor implements ThreadLocalAccessor {
 	private static final String KEY = CustomThreadLocalAccessor.class.getName();
 
 	@Override
-	public void extractValues(Map<String, Object> container) {
+	public void captureValues(ContextContainer container) {
 		String value = CustomThreadLocalHolder.getValue();
 		if (value != null) {
 			container.put(KEY, CustomThreadLocalHolder.getValue());
@@ -35,14 +36,14 @@ public class CustomThreadLocalAccessor implements ThreadLocalAccessor {
 	}
 
 	@Override
-	public void restoreValues(Map<String, Object> values) {
-		if (values.containsKey(KEY)) {
-			CustomThreadLocalHolder.setValue((String) values.get(KEY));
+	public void restoreValues(ContextContainer container) {
+		if (container.containsKey(KEY)) {
+			CustomThreadLocalHolder.setValue((String) container.get(KEY));
 		}
 	}
 
 	@Override
-	public void resetValues(Map<String, Object> values) {
+	public void resetValues(ContextContainer container) {
 		CustomThreadLocalHolder.remove();
 	}
 

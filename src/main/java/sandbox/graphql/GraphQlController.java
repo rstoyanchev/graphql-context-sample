@@ -16,6 +16,7 @@
 package sandbox.graphql;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
@@ -28,8 +29,10 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.context.ContextView;
-import sandbox.context.ContextSnapshot;
-import sandbox.context.ContextSnapshot.Scope;
+import sandbox.context.ContextContainer;
+import sandbox.context.ContextContainer.Scope;
+import sandbox.context.ReactorContextAccessor;
+import sandbox.context.ReactorContextUtils;
 import sandbox.context.ThreadLocalAccessor;
 import sandbox.graphql.context.CustomThreadLocalHolder;
 
@@ -44,33 +47,39 @@ public class GraphQlController {
 
 	private final GraphQL graphQL;
 
-	private final Map<String, ThreadLocalAccessor> threadLocalAccessors;
-
 	private final ExecutorService executor;
 
+	private final List<ThreadLocalAccessor> threadLocalAccessors;
 
-	public GraphQlController(GraphQL graphQL, ExecutorService executor, Map<String, ThreadLocalAccessor> threadLocalAccessors) {
+	private final List<ReactorContextAccessor> reactorAccessors;
+
+
+	public GraphQlController(GraphQL graphQL, ExecutorService executor,
+			List<ThreadLocalAccessor> threadLocalAccessors, List<ReactorContextAccessor> reactorAccessors) {
+
 		this.graphQL = graphQL;
 		this.executor = executor;
 		this.threadLocalAccessors = threadLocalAccessors;
+		this.reactorAccessors = reactorAccessors;
 	}
+
 
 	@PostMapping("/graphql")
 	Mono<Map<String, Object>> handle(@RequestBody Map<String, Object> body) {
 		return Mono.deferContextual(contextView -> {
-					ContextSnapshot snapshot = contextView.get(ContextSnapshot.class.getName());
+					ContextContainer container = contextView.get(ContextContainer.class.getName());
 
-					try (Scope scope = snapshot.restoreThreadLocalValues()) {
+					try (Scope scope = container.restoreThreadLocalValues()) {
 						log.info("FOO 1 {}", CustomThreadLocalHolder.getValue());
 						assertThatValueIsEqualTo("007", CustomThreadLocalHolder.getValue());
-						assertThatValueIsEqualTo("bar", snapshot.get("foo"));
-						executor.execute(new InstrumentedRunnable(snapshot, () -> {
+						assertThatValueIsEqualTo("bar", container.get("foo"));
+						executor.execute(new InstrumentedRunnable(container, () -> {
 							assertThatValueIsEqualTo("007", CustomThreadLocalHolder.getValue());
-							assertThatValueIsEqualTo("bar", snapshot.get("foo"));
+							assertThatValueIsEqualTo("bar", container.get("foo"));
 						}));
-						executor.execute(new InstrumentedRunnable(snapshot, () -> {
+						executor.execute(new InstrumentedRunnable(container, () -> {
 							assertThatValueIsEqualTo("007", CustomThreadLocalHolder.getValue());
-							assertThatValueIsEqualTo("bar", snapshot.get("foo"));
+							assertThatValueIsEqualTo("bar", container.get("foo"));
 						}));
 					}
 
@@ -81,11 +90,20 @@ public class GraphQlController {
 				})
 				.subscribeOn(Schedulers.boundedElastic())  // Switch threads to test context passing
 				.contextWrite(context -> {
-					// Capture + save ThreadLocal's in Reactor Context
-					ContextSnapshot snapshot = new ContextSnapshot(this.threadLocalAccessors);
-					snapshot.captureThreadLocalValues();
-					snapshot.put("foo", "bar");
-					return context.put(ContextSnapshot.class.getName(), snapshot);
+					// Create ContextContainer
+					ContextContainer container = ReactorContextUtils.create(this.threadLocalAccessors, this.reactorAccessors);
+
+					// Capture Reactor context values
+					container.captureThreadLocalValues();
+
+					// Capture Reactor context values
+					ReactorContextUtils.captureReactorContext(context, container);
+
+					// Add other values
+					container.put("foo", "bar");
+
+					// Save the container
+					return ReactorContextUtils.saveContainer(context, container);
 				});
 	}
 
@@ -99,9 +117,14 @@ public class GraphQlController {
 	}
 
 	private ExecutionInput executionInput(Map<String, Object> body, ContextView contextView) {
+
+		// Save ContextContainer in GraphQLContext
+		Map<String, Object> map = Collections.singletonMap(
+				ContextContainer.class.getName(), ReactorContextUtils.getContainer(contextView));
+
 		return ExecutionInput.newExecutionInput()
 				.query((String) body.get("query"))
-				.graphQLContext(Collections.singletonMap(ContextView.class.getName(), contextView)) // Tunnel Reactor context through GraphQL
+				.graphQLContext(map)
 				.build();
 	}
 

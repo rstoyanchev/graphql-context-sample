@@ -15,42 +15,27 @@
  */
 package sandbox.context;
 
-import java.util.Map;
-
-import org.springframework.beans.factory.ObjectProvider;
-
 /**
- * Interface to be implemented to assist with the extraction of ThreadLocal
- * values at the start of a reactive chain. The values are saved in a
- * {@link ContextSnapshot} so they can be restored later on a different thread.
- *
- * <p>Implementations of this interface would typically be declared as beans in
- * Spring configuration and are invoked in order.
+ * Contract to assist with extracting and restoring ThreadLocal values to and
+ * from a {@link ContextContainer}.
  */
 public interface ThreadLocalAccessor {
 
 	/**
-	 * Extract ThreadLocal values and add them to the given Map, so they can be
-	 * saved and subsequently {@link #restoreValues(Map) restored} around the
-	 * invocation of data fetchers and exception resolvers.
-	 * @param container to add extracted ThreadLocal values to
+	 * Capture ThreadLocal values and add them to the given container, so they
+	 * can be saved and subsequently {@link #restoreValues(ContextContainer)
+	 * restored} on a different thread.
 	 */
-	void extractValues(Map<String, Object> container);
+	void captureValues(ContextContainer container);
 
 	/**
-	 * Restore ThreadLocal context by looking up previously
-	 * {@link #extractValues(Map) extracted} values.
-	 * @param values previously extracted saved ThreadLocal values
+	 * Restore ThreadLocal values from the given container.
 	 */
-	void restoreValues(Map<String, Object> values);
+	void restoreValues(ContextContainer container);
 
 	/**
-	 * Reset ThreadLocal context for the given, previously
-	 * {@link #extractValues(Map) extracted} and then
-	 * {@link #restoreValues(Map) restored} values.
-	 * @param values previously extracted saved ThreadLocal values
+	 * Reset ThreadLocal values holders.
 	 */
-	void resetValues(Map<String, Object> values);
-
+	void resetValues(ContextContainer container);
 
 }
